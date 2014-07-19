@@ -23,6 +23,7 @@ const (
 // program no longer needs it.
 type Options struct {
 	Opt *C.rocksdb_options_t
+	readOnly bool
 }
 
 // ReadOptions represent all of the available options when reading from a
@@ -46,7 +47,7 @@ type WriteOptions struct {
 // NewOptions allocates a new Options object.
 func NewOptions() *Options {
 	opt := C.rocksdb_options_create()
-	return &Options{opt}
+	return &Options{opt,false}
 }
 
 // NewReadOptions allocates a new ReadOptions object.
@@ -66,6 +67,154 @@ func (o *Options) Close() {
 	C.rocksdb_options_destroy(o.Opt)
 }
 
+func (o *Options) SetLogLevel(n int) {
+	C.rocksdb_options_set_info_log_level(o.Opt, C.int(n))
+}
+
+// Tthe info LOG dir.
+// If it is empty, the log files will be in the same dir as data.
+// If it is non empty, the log files will be in the specified dir,
+// and the db data dir's absolute path will be used as the log file
+// name's prefix.
+func (o *Options) SetLogDir(dir string) {
+	C.rocksdb_options_set_db_log_dir(o.Opt, C.CString(dir))
+}
+
+// The absolute dir path for write-ahead logs (WAL).
+// If it is empty, the log files will be in the same dir as data,
+//   dbname is used as the data dir by default
+// If it is non empty, the log files will be in kept the specified dir.
+// When destroying the db,
+//   all log files in wal_dir and the dir itself is deleted
+func (o *Options) SetWalDir(dir string) {
+	C.rocksdb_options_set_wal_dir(o.Opt, C.CString(dir))
+}
+
+// If not zero, dump rocksdb.stats to LOG every stats_dump_period_sec
+// Default: 3600 (1 hour)
+func (o *Options) SetStatsDumpPeriod(secs uint){
+	C.rocksdb_options_set_stats_dump_period_sec(o.Opt, C.uint(secs))
+}
+
+// Target file size for compaction.
+// target_file_size_base is per-file size for level-1.
+// Target file size for level L can be calculated by
+// target_file_size_base * (target_file_size_multiplier ^ (L-1))
+// For example, if target_file_size_base is 2MB and
+// target_file_size_multiplier is 10, then each file on level-1 will
+// be 2MB, and each file on level 2 will be 20MB,
+// and each file on level-3 will be 200MB.
+// by default target_file_size_base is 2MB.
+func (o *Options) SetTargetFileSizeBase(n uint64) {
+	C.rocksdb_options_set_target_file_size_base(o.Opt, C.uint64_t(n))
+}
+
+// by default target_file_size_multiplier is 1, which means
+// by default files in different levels will have similar size.
+func (o *Options) SetTargetFileSizeMultiplier(n int) {
+	C.rocksdb_options_set_target_file_size_multiplier(o.Opt, C.int(n))
+}
+
+// Allows OS to incrementally sync files to disk while they are being
+// written, asynchronously, in the background.
+// Issue one request for every bytes_per_sync written. 0 turns it off.
+// Default: 0
+func (o *Options) SetBytesPerSync(n uint64) {
+	C.rocksdb_options_set_bytes_per_sync(o.Opt, C.uint64_t(n))
+}
+
+// Number of levels for this database
+func (o *Options) SetNumLevels(n int) {
+	C.rocksdb_options_set_num_levels(o.Opt, C.int(n))
+}
+
+// Number of files to trigger level-0 compaction. A value <0 means that
+// level-0 compaction will not be triggered by number of files at all.
+//
+// Default: 4
+func (o *Options) SetLevel0FileNumCompactionTrigger(n int) {
+	C.rocksdb_options_set_level0_file_num_compaction_trigger(o.Opt, C.int(n))
+}
+
+// Maximum number of concurrent background compaction jobs, submitted to
+// the default LOW priority thread pool.
+// If you're increasing this, also consider increasing number of threads in
+// LOW priority thread pool. For more information, see
+// Env::SetBackgroundThreads
+// Default: 1
+func (o *Options) SetMaxBackgroundCompactions(n int) {
+	C.rocksdb_options_set_max_background_compactions(o.Opt, C.int(n))
+}
+
+// the HIGH priority thread pool.
+//
+// By default, all background jobs (major compaction and memtable flush) go
+// to the LOW priority pool. If this option is set to a positive number,
+// memtable flush jobs will be submitted to the HIGH priority pool.
+// It is important when the same Env is shared by multiple db instances.
+// Without a separate pool, long running major compaction jobs could
+// potentially block memtable flush jobs of other db instances, leading to
+// unnecessary Put stalls.
+//
+// If you're increasing this, also consider increasing number of threads in
+// HIGH priority thread pool. For more information, see
+// Env::SetBackgroundThreads
+// Default: 1
+func (o *Options) SetMaxBackgroundFlushes(n int) {
+	C.rocksdb_options_set_max_background_flushes(o.Opt, C.int(n))
+}
+
+// Allow the OS to mmap file for reading sst tables. Default: false
+func (o *Options) SetAllowMMapReads(b bool) {
+	C.rocksdb_options_set_allow_mmap_reads(o.Opt, boolToUchar(b))
+}
+
+// Allow the OS to mmap file for writing. Default: false
+func (o *Options) SetAllowMMapWrites(b bool) {
+	C.rocksdb_options_set_allow_mmap_writes(o.Opt, boolToUchar(b))
+}
+
+// Data being read from file storage may be buffered in the OS
+// Default: true
+func (o *Options) SetAllowOSBuffer(b bool) {
+	C.rocksdb_options_set_allow_os_buffer(o.Opt, boolToUchar(b))
+}
+
+// The maximum number of write buffers that are built up in memory.
+// The default and the minimum number is 2, so that when 1 write buffer
+// is being flushed to storage, new writes can continue to the other
+// write buffer.
+// Default: 2
+func (o *Options) SetMaxWriteBufferNumber(n int) {
+	C.rocksdb_options_set_max_write_buffer_number(o.Opt, C.int(n))
+}
+
+// The minimum number of write buffers that will be merged together
+// before writing to storage.  If set to 1, then
+// all write buffers are fushed to L0 as individual files and this increases
+// read amplification because a get request has to check in all of these
+// files. Also, an in-memory merge may result in writing lesser
+// data to storage if there are duplicate records in each of these
+// individual write buffers.  Default: 1
+func (o *Options) SetMinWriteBufferNumberToMerge(n int) {
+	C.rocksdb_options_set_min_write_buffer_number_to_merge(o.Opt, C.int(n))
+}
+
+func (o *Options) SetReadOnly(b bool) {
+	o.readOnly = b
+}
+
+
+// If true, then the contents of data files are not synced
+// to stable storage. Their contents remain in the OS buffers till the
+// OS decides to flush them. This option is good for bulk-loading
+// of data. Once the bulk-loading is complete, please issue a
+// sync to the OS to flush all dirty buffesrs to stable storage.
+// Default: false
+func (o *Options) SetDisableDataSync(b bool) {
+	C.rocksdb_options_set_disable_data_sync(o.Opt, C.int(boolToUchar(b)))
+}
+
 // SetComparator sets the comparator to be used for all read and write
 // operations.
 //
@@ -79,6 +228,7 @@ func (o *Options) SetComparator(cmp *C.rocksdb_comparator_t) {
 }
 
 // SetErrorIfExists, if passed true, will cause the opening of a database that
+
 // already exists to throw an error.
 func (o *Options) SetErrorIfExists(error_if_exists bool) {
 	eie := boolToUchar(error_if_exists)
@@ -95,6 +245,14 @@ func (o *Options) SetCache(cache *Cache) {
 // SetEnv sets the Env object for the new database handle.
 func (o *Options) SetEnv(env *Env) {
 	C.rocksdb_options_set_env(o.Opt, env.Env)
+}
+
+func (e *Env) SetBackgroundThreads(n int) {
+	C.rocksdb_env_set_background_threads(e.Env, C.int(n))
+}
+
+func (e *Env) SetHighPriorityBackgroundThreads(n int) {
+	C.rocksdb_env_set_high_priority_background_threads(e.Env, C.int(n))
 }
 
 // SetInfoLog sets a *C.rocksdb_logger_t object as the informational logger
@@ -162,6 +320,15 @@ func (o *Options) SetCreateIfMissing(b bool) {
 	C.rocksdb_options_set_create_if_missing(o.Opt, boolToUchar(b))
 }
 
+// By default, RocksDB uses only one background thread for flush and
+// compaction. Calling this function will set it up such that total of
+// `total_threads` is used. Good value for `total_threads` is the number of
+// cores. You almost definitely want to call this function if your system is
+// bottlenecked by RocksDB.
+func (o *Options) IncreaseParallelism(n int) {
+	C.rocksdb_options_increase_parallelism(o.Opt, C.int(n))
+}
+
 // SetFilterPolicy causes Open to create a new database that will uses filter
 // created from the filter policy passed in.
 func (o *Options) SetFilterPolicy(fp *FilterPolicy) {
@@ -226,4 +393,12 @@ func (wo *WriteOptions) Close() {
 // See the LevelDB documentation for details.
 func (wo *WriteOptions) SetSync(b bool) {
 	C.rocksdb_writeoptions_set_sync(wo.Opt, boolToUchar(b))
+}
+
+func (wo *WriteOptions) DisableWAL(b bool) {
+	n := 0
+	if b { 
+		n = 1
+	}
+	C.rocksdb_writeoptions_disable_WAL(wo.Opt, C.int(n))
 }

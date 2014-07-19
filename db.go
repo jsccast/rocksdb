@@ -76,7 +76,13 @@ func Open(dbname string, o *Options) (*DB, error) {
 	ldbname := C.CString(dbname)
 	defer C.free(unsafe.Pointer(ldbname))
 
-	rocksdb := C.rocksdb_open(o.Opt, ldbname, &errStr)
+	var rocksdb *C.rocksdb_t
+	if o.readOnly {
+		// ToDo: unsigned char error_if_log_file_exist,
+		rocksdb = C.rocksdb_open_for_read_only(o.Opt, ldbname, C.uchar(0), &errStr)
+	} else {
+		rocksdb = C.rocksdb_open(o.Opt, ldbname, &errStr)
+	}
 	if errStr != nil {
 		gs := C.GoString(errStr)
 		C.free(unsafe.Pointer(errStr))
