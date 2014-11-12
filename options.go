@@ -4,6 +4,8 @@ package rocksdb
 // #include "rocksdb/c.h"
 import "C"
 
+import "log"
+
 // CompressionOpt is a value for Options.SetCompression.
 type CompressionOpt int
 
@@ -22,7 +24,7 @@ const (
 // To prevent memory leaks, Close must be called on an Options when the
 // program no longer needs it.
 type Options struct {
-	Opt *C.rocksdb_options_t
+	Opt      *C.rocksdb_options_t
 	readOnly bool
 }
 
@@ -47,7 +49,7 @@ type WriteOptions struct {
 // NewOptions allocates a new Options object.
 func NewOptions() *Options {
 	opt := C.rocksdb_options_create()
-	return &Options{opt,false}
+	return &Options{opt, false}
 }
 
 // NewReadOptions allocates a new ReadOptions object.
@@ -92,7 +94,7 @@ func (o *Options) SetWalDir(dir string) {
 
 // If not zero, dump rocksdb.stats to LOG every stats_dump_period_sec
 // Default: 3600 (1 hour)
-func (o *Options) SetStatsDumpPeriod(secs uint){
+func (o *Options) SetStatsDumpPeriod(secs uint) {
 	C.rocksdb_options_set_stats_dump_period_sec(o.Opt, C.uint(secs))
 }
 
@@ -204,7 +206,6 @@ func (o *Options) SetReadOnly(b bool) {
 	o.readOnly = b
 }
 
-
 // If true, then the contents of data files are not synced
 // to stable storage. Their contents remain in the OS buffers till the
 // OS decides to flush them. This option is good for bulk-loading
@@ -239,7 +240,9 @@ func (o *Options) SetErrorIfExists(error_if_exists bool) {
 //
 // This is usually wise to use. See also ReadOptions.SetFillCache.
 func (o *Options) SetCache(cache *Cache) {
-	C.rocksdb_options_set_cache(o.Opt, cache.Cache)
+	// ToDo: SetCache
+	// C.rocksdb_options_set_cache(o.Opt, cache.Cache)
+	log.Println("Warning: SetCache not currently implemented")
 }
 
 // SetEnv sets the Env object for the new database handle.
@@ -290,7 +293,9 @@ func (o *Options) SetMaxOpenFiles(n int) {
 // The default is roughly 4096 uncompressed bytes. A better setting depends on
 // your use case. See the LevelDB documentation for details.
 func (o *Options) SetBlockSize(s int) {
-	C.rocksdb_options_set_block_size(o.Opt, C.size_t(s))
+	// ToDo: SetBlockSize
+	// C.rocksdb_options_set_block_size(o.Opt, C.size_t(s))
+	log.Println("Warning: SetBlockSize not currently implemented")
 }
 
 // SetBlockRestartInterval is the number of keys between restarts points for
@@ -299,7 +304,9 @@ func (o *Options) SetBlockSize(s int) {
 // Most clients should leave this parameter alone. See the LevelDB
 // documentation for details.
 func (o *Options) SetBlockRestartInterval(n int) {
-	C.rocksdb_options_set_block_restart_interval(o.Opt, C.int(n))
+	// ToDo: SetBlockRestartInterval
+	// C.rocksdb_options_set_block_restart_interval(o.Opt, C.int(n))
+	log.Println("Warning: SetBlockRestartInterval not currently implemented")
 }
 
 // SetCompression sets whether to compress blocks using the specified
@@ -332,11 +339,13 @@ func (o *Options) IncreaseParallelism(n int) {
 // SetFilterPolicy causes Open to create a new database that will uses filter
 // created from the filter policy passed in.
 func (o *Options) SetFilterPolicy(fp *FilterPolicy) {
-	var policy *C.rocksdb_filterpolicy_t
-	if fp != nil {
-		policy = fp.Policy
-	}
-	C.rocksdb_options_set_filter_policy(o.Opt, policy)
+	// var policy *C.rocksdb_filterpolicy_t
+	// if fp != nil {
+	// 	policy = fp.Policy
+	// }
+	// ToDo: SetFilterPolicy
+	// C.rocksdb_options_set_filter_policy(o.Opt, policy)
+	log.Println("Warning: SetFilterPolicy not currently implemented")
 }
 
 // Close deallocates the ReadOptions, freeing its underlying C struct.
@@ -397,7 +406,7 @@ func (wo *WriteOptions) SetSync(b bool) {
 
 func (wo *WriteOptions) DisableWAL(b bool) {
 	n := 0
-	if b { 
+	if b {
 		n = 1
 	}
 	C.rocksdb_writeoptions_disable_WAL(wo.Opt, C.int(n))
